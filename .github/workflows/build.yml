@@ -1,0 +1,36 @@
+name: Build Aurora hw anonymous
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Activar login anonimo en la variante hw
+        run: |
+          sed -i '/create("huawei")/,/}/ s/"SHOW_ANONYMOUS_LOGIN", "false"/"SHOW_ANONYMOUS_LOGIN", "true"/' app/build.gradle.kts
+          F=app/src/huawei/java/com/aurora/store/util/FlavouredUtil.kt
+          sed -i 's/^import android.content.Context$/import android.content.Context\nimport com.aurora.Constants/' $F
+          sed -i 's/override val defaultDispensers: Set<String> = emptySet()/override val defaultDispensers = setOf(Constants.URL_DISPENSER)/' $F
+          git diff
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Aceptar licencias del SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compilar
+        run: ./gradlew assembleHuaweiDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aurora-hw-anonimo
+          path: app/build/outputs/apk/huawei/debug/*.apk
